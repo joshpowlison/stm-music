@@ -1,6 +1,6 @@
 {
 	"name": "Music",
-	"version": 10,
+	"version": 1,
 	"coreFiles": [
 		"info.json",
 		"browser-source.html",
