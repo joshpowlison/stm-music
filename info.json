@@ -1,6 +1,6 @@
 {
 	"name": "Music",
-	"version": 1,
+	"version": 2,
 	"coreFiles": [
 		"info.json",
 		"browser-source.html",
@@ -31,6 +31,11 @@
 			"name": "Music.Stop",
 			"accessMask": 0,
 			"function": "stop"
+		},
+		{
+			"name": "Music.Shuffle",
+			"accessMask": 0,
+			"function": "shuffle"
 		},
 		{
 			"name": "Music.LogAllOptions",
