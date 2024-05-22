@@ -18,12 +18,12 @@ const player = document.querySelector('audio');
 // VARIABLES
 var items = [];
 
-var folderName = 'assets';
+var folderName = '../../userData/Music/';
 
 // FUNCTIONS
 async function loadSettings(name, event)
 {
-	items = Utility.getAllPaths(module.settings.global.fileStructure.modules.Music[folderName]);
+	items = Utility.getAllPaths(module.settings.global.fileStructure.userData.Music);
 }
 
 async function musicPlay(name, event)
@@ -49,7 +49,7 @@ async function musicPlay(name, event)
 		}
 
 		player.currentTime	= 0;
-		player.src = folderName + '/' + item;
+		player.src = folderName + item;
 	}
 
 	player.play();

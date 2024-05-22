@@ -1,0 +1,34 @@
+{
+	"commands": [
+		{
+			"name": "Music.LoadSettings",
+			"accessMask": 255,
+			"function": "loadSettings"
+		},
+		{
+			"name": "Music.Play",
+			"accessMask": 0,
+			"function": "play"
+		},
+		{
+			"name": "Music.Pause",
+			"accessMask": 0,
+			"function": "pause"
+		},
+		{
+			"name": "Music.Stop",
+			"accessMask": 0,
+			"function": "stop"
+		},
+		{
+			"name": "Music.Shuffle",
+			"accessMask": 0,
+			"function": "shuffle"
+		},
+		{
+			"name": "Music.LogAllOptions",
+			"accessMask": 255,
+			"function": "logAllOptions"
+		}
+	]
+}
