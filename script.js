@@ -23,7 +23,7 @@ var folderName = '../../userData/Music/';
 // FUNCTIONS
 async function loadSettings(name, event)
 {
-	items = Utility.getAllPaths(module.settings.global.fileStructure.userData.Music);
+	items = Utility.getAllPaths(module.globalSettings.fileStructure.userData.Music);
 }
 
 async function musicPlay(name, event)
