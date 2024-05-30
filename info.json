@@ -1,4 +1,8 @@
 {
+	"guid": "31D49FD8-F129-0FF9-660F-836D408A8C0C",
 	"name": "Music",
-	"version": 2
+	"type": 0,
+	"isPublic": 0,
+	"version": 2,
+	"lastUpdateDate": "2024-05-29 17:31:44"
 }

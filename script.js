@@ -1,7 +1,7 @@
-// SETTINGS
 const moduleFunctions = {
 	"loadSettings": loadSettings,
 	"play": musicPlay,
+	"playRandom": musicPlayRandom,
 	"pause": musicPause,
 	"stop": musicStop,
 	"shuffle": musicShuffle,
@@ -10,39 +10,35 @@ const moduleFunctions = {
 
 module.LoadModule(moduleFunctions);
 
-let onTrackEnd = new Event();
+///////////////////
+//// CONSTANTS ////
+///////////////////
 
-// CONSTANTS
 const player = document.querySelector('audio');
 
-// VARIABLES
-var items = [];
+///////////////////
+//// VARIABLES ////
+///////////////////
 
-var folderName = '../../userData/Music/';
+let isShuffling = false;
+let items = [];
+let folderName = '../../userData/Music/';
 
-// FUNCTIONS
-async function loadSettings(name, event)
-{
-	items = Utility.getAllPaths(module.globalSettings.fileStructure.userData.Music);
+///////////////////
+//// FUNCTIONS ////
+///////////////////
+async function loadSettings(name, event) {
+	items = Utility.getAllPaths(module.globalSettings.fileStructure.userData.Music, [ 'mp3', 'wav', 'flac', 'aiff' ]);
 }
 
-async function musicPlay(name, event)
-{
+async function musicPlay(name, event) {
 	// If we've moved to a new track, go there
-	if (event != null)
+	if (event !== null)
 	{
-		let item = null;
+		let item = Utility.getMatchingFileInList(items, event);
 		
-		// If it's an exact match to an item in the list
-		if (items.indexOf(event) > -1)
-			item = event;
-		
-		// If no exact match, look for a general match
-		if (item == null)
-			item = Utility.getMatchingFileInList(items, event);
-
-		// If no match STILL, log an error
-		if (item == null)
+		// If no match, log an error
+		if (item === null)
 		{
 			module.F('Console.LogError', 'No Music track named "' + JSON.stringify(event) + '" found.');
 			return;
@@ -55,27 +51,34 @@ async function musicPlay(name, event)
 	player.play();
 
 	// Mute game
+	// TODO: Pull this out. This is a separate piece of logic,
+	//  Music shouldn't know about it. AND it's my personal setup,
+	//  unrelated to many people, could cause random surprises.
 	module.F('OBS.MuteAudioSource', 'Zoom HD60S');
 }
 
-async function musicPause(name, event)
-{
+async function musicPlayRandom() {
+	let item = Utility.getRandomItem(items);
+
+	player.currentTime	= 0;
+	player.src = folderName + item;
+	player.play();
+}
+
+async function musicPause(name, event) {
 	player.pause();
 
 	// Unmute game
 	module.F('OBS.UnmuteAudioSource', 'Zoom HD60S');
 }
 
-async function musicStop(name, event)
-{
+async function musicStop(name, event) {
 	player.currentTime = 0;
 	player.pause();
 
 	// Unmute game
 	module.F('OBS.UnmuteAudioSource', 'Zoom HD60S');
 }
-
-let isShuffling = false;
 
 async function musicShuffle(name, event) {
 	let shouldShuffle = (event === true);
@@ -88,8 +91,7 @@ async function musicShuffle(name, event) {
 	if(shouldShuffle) {
 		player.addEventListener('ended', playRandomTrack);
 		isShuffling = true;
-	}
-	else {
+	} else {
 		player.removeEventListener('ended', playRandomTrack);
 		isShuffling = false;
 	}
@@ -100,8 +102,7 @@ async function playRandomTrack() {
 	await musicPlay(null, track);
 }
 
-async function logAllOptions(name, event)
-{
+async function logAllOptions(name, event) {
 	var regexGet = /\/(.+)\.[^.]+$/;
 	var trackNames = [];
 	var publicLog = '';
@@ -126,5 +127,8 @@ async function logAllOptions(name, event)
 	console.log(publicLog);
 }
 
-// LISTENERS
+///////////////////
+//// LISTENERS ////
+///////////////////
+
 player.addEventListener('ended', () => musicStop(null, null));
