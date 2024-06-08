@@ -1,4 +1,107 @@
-body
-{
-	visibility:hidden;
+body {
+	font-family:'BentonSans';
+	color:white;
+}
+
+main {
+}
+
+p {
+	color:white;
+}
+
+#title {
+	font-size:3em;
+	font-weight:bold;
+}
+
+#credits {
+	font-size:2em;
+}
+
+#text {
+	position:fixed;
+	top:10vh;
+	bottom:2em;
+	left:10vh;
+	right:10vh;
+	
+	z-index:10;
+	
+	display:flex;
+	justify-content:end;
+	align-items:end;
+	flex-direction:column;
+}
+
+#text *{
+	text-align:right;
+	margin:0;
+	
+	text-shadow:
+			-2px -2px 0 #000,
+			0   -2px 0 #000,
+			2px -2px 0 #000,
+			2px  0   0 #000,
+			2px  2px 0 #000,
+			0    2px 0 #000,
+			-2px  2px 0 #000,
+			-2px  0   0 #000;
+}
+
+#needle {
+	object-fit:contain;
+	position:fixed;
+	height:100%;
+	right:0;
+	transform-origin:100% 100%;
+}
+
+#record {
+	/* Stick to the right side, and have it within the bounds */
+	display:block;
+	position:fixed;
+	height:110vh;
+	width:110vh;
+	right:20vh;
+	bottom:-10vh;
+	object-fit:contain;
+	z-index:0;
+	
+	background-color:red;
+	border-radius:100%; /* TODO: Remove once get this in */
+	overflow:hidden;
+}
+
+.record-image, .record-cover {
+	width:100%;
+	height:100%;
+	position:absolute;
+	
+	object-fit:contain;
+}
+
+.record-image{
+	z-index:0;
+}
+
+.record-cover {
+	z-index:1;
+}
+
+#progress-bar-container{
+	display:block;
+	position:fixed;
+	width:100%;
+	height:1em;
+	bottom:0;
+	z-index:10;
+	
+	background-color:black;
+}
+
+#progress-bar {
+	height:100%;
+	width:50%;
+	background-color:#e8da20;
 }

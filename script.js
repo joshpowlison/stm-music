@@ -2,6 +2,7 @@ const moduleFunctions = {
 	"loadSettings": loadSettings,
 	"play": play,
 	"playSong": playSong,
+	"playAlbum": playAlbum,
 	"pause": pause,
 	"stop": stop,
 	"shuffle": shuffle,
@@ -11,6 +12,7 @@ const moduleFunctions = {
 	"shuffleAlbum": shuffleAlbum,
 	"logAllOptions": logAllOptions,
 };
+
 
 module.LoadModule(moduleFunctions);
 
@@ -25,10 +27,16 @@ const SUPPORTED_EXTENSIONS = [ 'mp3', 'wav', 'flac', 'aiff' ];
 //// VARIABLES ////
 ///////////////////
 
+let albumData = {};
+let CSV = null;
+
 let items = [];
 let folderName = '../../userData/Music/';
 
 let queue = [];
+
+let eventStartPlaying = new Event();
+let eventPausePlayer = new Event();
 
 ///////////////////
 //// FUNCTIONS ////
@@ -36,6 +44,10 @@ let queue = [];
 
 async function loadSettings(name, event) {
 	items = Utility.getAllPaths(module.globalSettings.fileStructure.userData.Music, SUPPORTED_EXTENSIONS);
+	
+	// Temporary:
+	if(player.paused)
+		shuffleAlbum(null, "Songs to Code By");
 }
 
 async function tryGetItem(name) {
@@ -88,8 +100,16 @@ async function playSong(name, event) {
 	
 	queue = [event];
 	await tryPlayNextInQueue();
+}
 
-	await player.play();
+async function playAlbum(name, event) {
+	let albumItems = await tryGetAlbum(event);
+	if (albumItems === null) {
+		return;
+	}
+	
+	queue = albumItems;
+	await tryPlayNextInQueue();
 }
 
 async function pause(name, event) {
@@ -157,6 +177,7 @@ async function tryPlayNextInQueue() {
 	// If we have no other songs, exit
 	if(queue.length === 0) {
 		module.F('Console.Log', 'The end of the music queue has been reached.');
+		eventPausePlayer.invoke();
 		return;
 	}
 	
@@ -167,6 +188,8 @@ async function tryPlayNextInQueue() {
 	
 	player.src = folderName + item;
 	await player.play();
+	
+	onSongChange(item);
 }
 
 async function logAllOptions(name, event) {
@@ -192,8 +215,80 @@ async function logAllOptions(name, event) {
 	console.log(publicLog);
 }
 
+const RECORD = document.getElementById('record');
+const RECORD_IMAGE = document.querySelector('.record-image');
+const RECORD_GRAPHIC = document.querySelector('.record-cover');
+const NEEDLE = document.getElementById('needle');
+const SONG_TITLE_EL = document.getElementById('title');
+const SONG_CREDITS_EL = document.getElementById('credits');
+const PROGRESS_BAR = document.getElementById('progress-bar');
+const PROGRESS_TIME = document.getElementById('progress-time');
+let recordAngle = 0;
+let RPM = 45; // 45 RPM, a vinyl single
+let recordRotationPerMs = -(RPM / 60 / 1000) * 360; // Amount of total rotation to rotate per ms
+let lastFrameTimestamp = 0;
+
+let needleRestingAngle = 0;
+let needleMinAngle = 8;
+let needleMaxAngle = 27;
+
+function onAnimationFrame(frameTimestamp)
+{
+	let deltaTime = (frameTimestamp - lastFrameTimestamp);
+	lastFrameTimestamp = frameTimestamp;
+	if(!player.paused) {
+		recordAngle += (deltaTime * recordRotationPerMs);
+		RECORD.style.transform = 'rotate(' + recordAngle + 'deg)';
+		
+		let percentProgress = (player.currentTime / player.duration);
+		PROGRESS_BAR.style.width = (percentProgress * 100) + '%';
+		
+		// Update needle
+		let needleAngle = needleMinAngle + ((needleMaxAngle - needleMinAngle) * percentProgress);
+		NEEDLE.style.transform = 'rotate(' + -needleAngle + 'deg)';
+	} else {
+		NEEDLE.style.transform = 'rotate(' + -needleRestingAngle + 'deg)';
+	}
+	
+	window.requestAnimationFrame(onAnimationFrame);
+}
+
+async function onSongChange(songData){
+	if (CSV === null) {
+		CSV = (await import('../../shared/csvParser.js')).default;
+	}
+	
+	let data = /^([^/\\]+)[\\/]([^/\\]+)$/.exec(songData);
+	let albumPath = folderName + data[1];
+	let songFile = data[2];
+	console.log(albumPath);
+	
+	let albumArtPath = albumPath + '/cover.jpg';
+	let albumDataPath = albumPath + '/data.csv';
+	
+	if(!(albumPath in albumData)) {
+		let csvText = await fetch(albumDataPath).then(response => response.text());
+		console.log(csvText);
+		let objectified = await CSV.objectify(csvText, "filename");
+		console.log(objectified);
+		
+		albumData[albumPath] = {
+			data: objectified
+		};
+	}
+	
+	let trackData = albumData[albumPath].data[songFile];
+	console.log(albumPath, songFile);
+	
+	RECORD_IMAGE.src = albumArtPath;
+	
+	SONG_CREDITS_EL.innerHTML = trackData.album + ' - ' + trackData.artist;
+	SONG_TITLE_EL.innerHTML = trackData.title;
+}
+
 ///////////////////
 //// LISTENERS ////
 ///////////////////
 
 player.addEventListener('ended', tryPlayNextInQueue);
+window.requestAnimationFrame(onAnimationFrame);
