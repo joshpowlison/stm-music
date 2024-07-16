@@ -2,60 +2,64 @@ import {Utility} from '../../shared/utility.js';
 import Event from '../../shared/event.js';
 import Record from './record.js';
 import SongInfo from './songInfo.js';
+import MusicDataController from './musicDataController.js';
 
-let self; // This only works if we're good with a singleton...
+// TODO: Resolve redundant code
+
+///////////////////
+//// CONSTANTS ////
+///////////////////
+
+const player = document.querySelector('audio');
+
+///////////////////
+//// VARIABLES ////
+///////////////////
+
+let folderName = '../../userData/Music/';
+
+let trackQueue = [];
+
+///////////////////
+//// FUNCTIONS ////
+///////////////////
+
+const PROGRESS_BAR = document.getElementById('progress-bar');
+let lastFrameTimestamp = 0;
 
 export default class MusicPlayer {
+	musicDataController;
+
 	eventNewSong = new Event();
 	eventPlay = new Event();
 	eventPause = new Event();
 	eventStop = new Event();
 	eventTimeUpdate = new Event();
+
+	eventMessage = new Event();
+	eventError = new Event();
 	
-	currentRecord = null;
-	currentSongInfo = null;
+	animationFrameBound = this.onAnimationFrame.bind(this);
 	
-	constructor() {
-		self = this;
-		
-		player.addEventListener('ended', this.tryPlayNextInQueue.bind(this));
-		window.requestAnimationFrame(this.onAnimationFrame.bind(this));
+	async initialize() {
+		player.addEventListener('ended', this.tryPlayNextTrackInQueue.bind(this));
+		window.requestAnimationFrame(this.animationFrameBound);
+		this.musicDataController = await MusicDataController.Create();
 	}
 	
-	getModuleFunctions() {
-		return {
-			"loadSettings": this.loadSettings.bind(this),
-			"play": this.play.bind(this),
-			"playSong": this.playSong.bind(this),
-			"playAlbum": this.playAlbum.bind(this),
-			"pause": this.pause.bind(this),
-			"stop": this.stop.bind(this),
-			"shuffle": this.shuffle.bind(this),
-			"skip": this.skip.bind(this),
-			"queueSong": this.queueSong.bind(this),
-			"queueAlbum": this.queueAlbum.bind(this),
-			"shuffleAlbum": this.shuffleAlbum.bind(this),
-			"logAllOptions": this.logAllOptions.bind(this),
-		}
+	async loadSettings(event) {
+		let fileStructure = module.globalSettings.fileStructure.userData.Music;
+		await this.musicDataController.updateData(folderName, fileStructure);
 	}
 	
-	async loadSettings(name, event) {
-		console.log('IS SELF SET?', this);
-		items = Utility.getAllPaths(module.globalSettings.fileStructure.userData.Music, SUPPORTED_EXTENSIONS);
-		
-		// Temporary:
-		if(player.paused)
-			this.shuffleAlbum(null, "Songs to Code By");
-	}
-	
-	async play(name, event) {
+	async play(event) {
 		if(!player.paused) {
-			module.F('Console.LogError', 'Music is currently playing.');
+			this.eventError.invoke('Music is currently playing.');
 			return;
 		}
 		
 		if(player.src === null) {
-			module.F('Console.LogError', 'No song is currently queued.');
+			this.eventError.invoke('No song is currently queued.');
 			return;
 		}
 		
@@ -63,96 +67,112 @@ export default class MusicPlayer {
 		this.eventPlay.invoke();
 	}
 
-	async playSong(name, event) {
-		let item = await tryGetItem(event);
-		if (item === null) {
+	async playSong(event) {
+		let trackData = await this.tryGetTrack(event);
+		if (trackData === null) {
 			return;
 		}
 		
-		queue = [event];
-		await this.tryPlayNextInQueue();
+		trackQueue = [trackData];
+		await this.tryPlayNextTrackInQueue();
 	}
 
-	async playAlbum(name, event) {
-		let albumItems = await tryGetAlbum(event);
-		if (albumItems === null) {
+	async playAlbum(event) {
+		let trackDataset = await this.tryGetAlbum(event);
+		if (trackDataset === null) {
 			return;
 		}
 		
-		queue = albumItems;
-		await this.tryPlayNextInQueue();
+		trackQueue = trackDataset;
+		await this.tryPlayNextTrackInQueue();
 	}
 
-	async pause(name, event) {
+	async pause(event) {
 		player.pause();
 		this.eventPause.invoke();
 	}
 
-	async stop(name, event) {
-		queue = [];
+	async stop(event) {
+		trackQueue.length = 0;
 		player.currentTime = 0;
 		player.pause();
 		this.eventStop.invoke();
 		PROGRESS_BAR.style.width = '0%'; // Reduce the progress bar
 	}
 
-	async shuffle(name, event) {
-		queue = Utility.getArrayShuffled(items);
-		await this.tryPlayNextInQueue();
+	async shuffle(event) {
+		let allTracks = await this.musicDataController.getAllTracks();
+		trackQueue = Utility.getArrayShuffled(allTracks);
+		await this.tryPlayNextTrackInQueue();
 	}
 
-	async skip(name, event) {
-		await this.tryPlayNextInQueue();
+	async skip(event) {
+		await this.tryPlayNextTrackInQueue();
 	}
 
-	async queueSong(name, event) {
-		let item = await tryGetItem(event);
-		if (item === null) {
+	async queueSong(event) {
+		let trackDataset = await this.tryGetTrack(event);
+		if (trackDataset === null) {
 			return;
 		}
 		
-		queue.push(event);
+		trackQueue.push(event);
 		
 		if(player.paused) {
-			await this.tryPlayNextInQueue();
+			await this.tryPlayNextTrackInQueue();
 		}
 	}
 
-	async queueAlbum(name, event) {
-		let albumItems = await tryGetAlbum(event);
-		if (albumItems === null) {
+	async queueAlbum(event) {
+		let trackDataset = await this.tryGetAlbum(event);
+		if (trackDataset === null) {
 			return;
 		}
 		
-		queue.push(...albumItems);
+		trackQueue.push(...trackDataset);
 		
 		if(player.paused) {
-			await this.tryPlayNextInQueue();
+			await this.tryPlayNextTrackInQueue();
 		}
 	}
 
-	async shuffleAlbum(name, event) {
-		let albumItems = await tryGetAlbum(event);
-		if (albumItems === null) {
+	async shuffleAlbum(event) {
+		let trackDataset = await this.tryGetAlbum(event);
+		if (trackDataset === null) {
 			return;
 		}
 		
-		queue = Utility.getArrayShuffled(albumItems);
+		trackQueue = Utility.getArrayShuffled(trackDataset);
 		
-		await this.tryPlayNextInQueue();
+		await this.tryPlayNextTrackInQueue();
+	}
+
+	async playArtist(event) {
+		let trackDataset = await this.tryGetArtist(event);
+		if (trackDataset === null) {
+			return;
+		}
+
+		trackQueue = trackDataset;
+		await this.tryPlayNextTrackInQueue();
+	}
+
+	async shuffleArtist(event) {
+		let trackDataset = await this.tryGetArtist(event);
+		if (trackDataset === null) {
+			return;
+		}
+
+		trackQueue = Utility.getArrayShuffled(trackDataset);
+
+		await this.tryPlayNextTrackInQueue();
 	}
 	
-	async logAllOptions(name, event) {
-		let regexGet = /\/(.+)\.[^.]+$/;
-		let trackNames = [];
+	async logAllOptions(event) {
 		let publicLog = '';
-
-		// Get clean names
-		for(let i = 0, l = items.length; i < l; i ++) {
-			let displayName = regexGet.exec(items[i])[1];
-			trackNames.push(displayName);
-		}
-
+		
+		let trackNames = await this.musicDataController.getTrackTitles();
+		
 		// Compile them all into one sorted log
 		trackNames.sort();
 		for(let i = 0, l = trackNames.length; i < l; i ++) {
@@ -165,7 +185,7 @@ export default class MusicPlayer {
 		console.log(publicLog);
 	}
 	
-	async tryPlayNextInQueue() {
+	async tryPlayNextTrackInQueue() {
 		// Stop the current track
 		await player.pause();
 		this.eventPause.invoke();
@@ -173,54 +193,62 @@ export default class MusicPlayer {
 		player.src = null;
 		
 		// If we have no other songs, exit
-		if(queue.length === 0) {
-			module.F('Console.Log', 'The end of the music queue has been reached.');
-			this.eventPause.invoke();
+		if(trackQueue.length === 0) {
+			this.eventMessage.invoke('The end of the music queue has been reached.');
+			this.eventStop.invoke();
 			return;
 		}
 		
 		// Try playing the next item in the queue
-		let itemName = queue.shift();
-		module.F('Console.Log', 'Now playing \"' + itemName + '\".');
-		let item = await tryGetItem(itemName);
+		let trackData = trackQueue.shift();
+		this.eventMessage.invoke(`Now playing "${trackData.title}".`);
+
+		let albumData = await this.musicDataController.getAlbumDataFromTrackData(trackData);
 		
-		player.src = folderName + item;
-		this.onSongChange(item);
+		player.src = folderName + albumData.albumPath + trackData.filename;
+		this.onSongChange(albumData, trackData);
 		
 		await player.play();
 		this.eventPlay.invoke();
 	}
-	
-	async onSongChange(songData){
-		if (CSV === null) {
-			CSV = (await import('../../shared/csvParser.js')).default;
+
+	async tryGetTrack(name) {
+		let item = await this.musicDataController.getFirstByTrackTitle(name);
+
+		if (item === null) {
+			this.eventError.invoke(`No Music track named "${name}" found.`);
 		}
-		
-		let data = /^([^/\\]+)[\\/]([^/\\]+)$/.exec(songData);
-		let albumPath = folderName + data[1];
-		let songFile = data[2];
-		console.log(albumPath);
-		
-		let albumArtPath = albumPath + '/cover.jpg';
-		let albumDataPath = albumPath + '/data.csv';
-		
-		if(!(albumPath in albumData)) {
-			let csvText = await fetch(albumDataPath).then(response => response.text());
-			console.log(csvText);
-			let objectified = await CSV.objectify(csvText, "filename");
-			console.log(objectified);
-			
-			albumData[albumPath] = {
-				data: objectified
-			};
+
+		return item;
+	}
+
+	async tryGetArtist(artistName) {
+		let albumItems = await this.musicDataController.getAllByArtistName(artistName);
+
+		if (albumItems === null) {
+			this.eventError.invoke(`No artist named "${artistName}" found.`);
 		}
-		
-		let trackData = albumData[albumPath].data[songFile];
-		console.log(albumPath, songFile);
-		
+
+		return albumItems;
+	}
+
+	async tryGetAlbum(albumName) {
+		let albumItems = await this.musicDataController.getAllByAlbumName(albumName);
+
+		if (albumItems === null) {
+			this.eventError.invoke('No Music album named "' + albumName + '" found.');
+		}
+
+		return albumItems;
+	}
+
+	async onSongChange(albumData, trackData){
+
+		// Get the first image from the folder
 		this.eventNewSong.invoke(trackData);
 		
 		// Create a new record
+		let albumArtPath = folderName + albumData.albumArtPath;
 		let record = new Record(albumArtPath, document.body);
 		await this.eventTimeUpdate.addListener(record, record.updateTime);
 		await this.eventPlay.addListener(record, record.setPlaying);
@@ -262,65 +290,12 @@ export default class MusicPlayer {
 			this.eventTimeUpdate.invoke(data).catch(e => console.log(e));
 		}
 		
-		window.requestAnimationFrame(this.onAnimationFrame.bind(this));
+		window.requestAnimationFrame(this.animationFrameBound);
+	}
+	
+	static async Create() {
+		let instance = new MusicPlayer();
+		await instance.initialize();
+		return instance;
 	}
 }
-
-///////////////////
-//// CONSTANTS ////
-///////////////////
-
-const player = document.querySelector('audio');
-const SUPPORTED_EXTENSIONS = [ 'mp3', 'wav', 'flac', 'aiff' ];
-
-///////////////////
-//// VARIABLES ////
-///////////////////
-
-let albumData = {};
-let CSV = null;
-
-let items = [];
-let folderName = '../../userData/Music/';
-
-let queue = [];
-
-///////////////////
-//// FUNCTIONS ////
-///////////////////
-
-
-
-async function tryGetItem(name) {
-	let item = null;
-	
-	if (name !== null) {
-		item = Utility.getMatchingFileInList(items, name);
-	}
-	
-	if (item === null) {
-		module.F('Console.LogError', 'No Music track named "' + JSON.stringify(name) + '" found.');
-	}
-	
-	return item;
-}
-
-async function tryGetAlbum(albumName) {
-	let albumItems = null;
-	
-	if(albumName in module.globalSettings.fileStructure.userData.Music){
-		albumItems = Utility.getAllPaths(module.globalSettings.fileStructure.userData.Music[albumName], SUPPORTED_EXTENSIONS);
-	}
-	
-	if (albumItems === null) {
-		module.F('Console.LogError', 'No Music album named "' + JSON.stringify(albumName) + '" found.');
-	}
-	
-	return albumItems;
-}
-
-const SONG_TITLE_EL = document.getElementById('title');
-const SONG_CREDITS_EL = document.getElementById('credits');
-const PROGRESS_BAR = document.getElementById('progress-bar');
-const PROGRESS_TIME = document.getElementById('progress-time');
-let lastFrameTimestamp = 0;

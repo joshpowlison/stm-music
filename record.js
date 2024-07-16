@@ -30,9 +30,13 @@ export default class Record {
 		recordCoverEl.src = 'record-cover.svg';
 		containerEl.appendChild(recordCoverEl);
 		
-		let recordImageEl = document.createElement('img');
+		// Create the image for the record, but only add
+		// an actual graphic if we have one
+		let recordImageEl = document.createElement('div');
+		if(imagePath !== null) {
+			recordImageEl.style.backgroundImage = `url("${imagePath}")`;
+		}
 		recordImageEl.className = 'record-image';
-		recordImageEl.src = imagePath;
 		containerEl.appendChild(recordImageEl);
 		
 		window.requestAnimationFrame(this.onAnimationFrame.bind(this));

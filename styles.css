@@ -94,11 +94,14 @@ p {
 	object-fit:contain;
 	z-index:3;
 	
-	background-color:red;
-	border-radius:100%; /* TODO: Remove once get this in */
+	background-color:black;
+	border-radius:100%;
 	overflow:hidden;
 	
 	animation:record-in .25s ease-out;
+
+	-webkit-mask-image: url('record-mask.svg');
+	-webkit-mask-size: cover;
 }
 
 @keyframes record-in {
@@ -122,10 +125,12 @@ p {
 	position:absolute;
 	
 	object-fit:contain;
+	background-size:cover;
 }
 
 .record-image{
 	z-index:0;
+	background-color: #2e2f30;
 }
 
 .record-cover {
